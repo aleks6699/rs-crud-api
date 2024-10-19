@@ -16,10 +16,8 @@
     "prettier-format": "prettier --config .prettierrc src/**/*.ts --write",
     "test": "jest --silent"
   },
-  
   "author": "Oleksandr Tsurlan",
   "license": "ISC",
-
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/node": "^20.11.16",
@@ -35,7 +33,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "dotenv": "^16.4.1",
+    "dotenv": "^16.4.5",
     "uuid": "^9.0.1"
   }
 }

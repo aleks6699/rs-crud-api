@@ -131,35 +131,47 @@ function deleteUser(id: string, res: http.ServerResponse) {
 
 
 const server = http.createServer((req, res) => {
-  const id = req.url.split('/').pop();
+  try {
+    const id = req.url.split('/').pop();
 
-  if (req.method === 'POST' && req.url === '/api/users') {
-    return createUser(req, res);
+    if (req.method === 'POST' && req.url === '/api/users') {
+      return createUser(req, res);
+    }
+
+    if (req.method === 'GET' && req.url === '/api/users') {
+      return getUsers(res);
+    }
+
+    if (req.method === 'GET' && req.url?.startsWith('/api/users/')) {
+      return getUserById(id, res);
+    }
+
+    if (req.method === 'PUT' && req.url?.startsWith('/api/users/')) {
+      return getUserUpdateId(id, res, req);
+    }
+
+    if (req.method === 'DELETE' && req.url?.startsWith('/api/users/')) {
+      return deleteUser(id, res);
+    }
+
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Not found' }));
+
+  } catch (error) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: "Internal server error" }));
   }
 
-  if (req.method === 'GET' && req.url === '/api/users') {
-    return getUsers(res);
-  }
-
-  if (req.method === 'GET' && req.url?.startsWith('/api/users/')) {
-    return getUserById(id, res);
-  }
-
-  if (req.method === 'PUT' && req.url?.startsWith('/api/users/')) {
-    return getUserUpdateId(id, res, req);
-  }
-
-  if (req.method === 'DELETE' && req.url?.startsWith('/api/users/')) {
-    return deleteUser(id, res);
-  }
-
-  res.statusCode = 404;
-  res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify({ error: 'Not found' }));
 });
 
 
 
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
+});
+
+server.on('error', (error) => {
+  console.error(error);
 });

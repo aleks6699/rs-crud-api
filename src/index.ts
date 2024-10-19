@@ -52,7 +52,7 @@ async function requestBodyParser(req: http.IncomingMessage): Promise<User> {
 
 async function createUser(req: http.IncomingMessage, res: http.ServerResponse) {
   try {
-    const body = await requestBodyParser(req); // Парсим тело запроса
+    const body = await requestBodyParser(req);
     const { username, age, hobbies } = body;
 
     if (!username || typeof age !== 'number' || !Array.isArray(hobbies)) {
@@ -107,6 +107,24 @@ async function getUserUpdateId(id: string, res: http.ServerResponse, req: http.I
 
 }
 
+function deleteUser(id: string, res: http.ServerResponse) {
+  if (!validate(id)) {
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = 400;
+    return res.end(JSON.stringify({ error: 'Invalid userId format (not a UUID)' }));
+  }
+
+  if (!data.users.find((user) => user.id === id)) {
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = 404;
+    return res.end(JSON.stringify({ error: 'User not found' }));
+  }
+  res.setHeader('Content-Type', 'application/json');
+  res.statusCode = 200;
+  data.users = data.users.filter((user) => user.id !== id);
+  return res.end(JSON.stringify({ message: 'User deleted successfully' }));
+}
+
 
 
 
@@ -128,13 +146,12 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'PUT' && req.url?.startsWith('/api/users/')) {
-
     return getUserUpdateId(id, res, req);
   }
 
-  // if (req.method === 'DELETE' && req.url?.startsWith('/api/users/')) {
-  //    return deleteUser(id, res);
-  // }
+  if (req.method === 'DELETE' && req.url?.startsWith('/api/users/')) {
+    return deleteUser(id, res);
+  }
 
   res.statusCode = 404;
   res.setHeader('Content-Type', 'application/json');

@@ -46,7 +46,7 @@ req: http.IncomingMessage, res: http.ServerResponse) {
     const newUser: User = { id: uuidv4(), username, age, hobbies };
     data.users.push(newUser);
 
-    sendUpdateToMaster(); // Отправка обновлений мастеру
+    sendUpdateToMaster(); 
 
     res.statusCode = 201;
     res.setHeader('Content-Type', 'application/json');

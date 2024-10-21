@@ -4,6 +4,13 @@ import { User } from './types/types';
 import http from 'http';
 import { requestBodyParser } from './utills';
 
+function sendUpdateToMaster() {
+  if (process.send) {
+    process.send({ type: 'UPDATE_DATA', users: data.users });
+    console.log('Sent update to master:', data.users);
+  }
+}
+
 export function getUsers(res: http.ServerResponse): void {
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(data.users));
@@ -26,10 +33,7 @@ export function getUserById(id: string, res: http.ServerResponse) {
 }
 
 export async function createUser(
-  req: http.IncomingMessage,
-  res: http.ServerResponse,
-  syncWithMaster: (updatedUsers: User[]) => void
-) {
+req: http.IncomingMessage, res: http.ServerResponse) {
   try {
     const body = await requestBodyParser(req);
     const { username, age, hobbies } = body;
@@ -42,23 +46,21 @@ export async function createUser(
     const newUser: User = { id: uuidv4(), username, age, hobbies };
     data.users.push(newUser);
 
-    syncWithMaster(data.users);
+    sendUpdateToMaster(); // Отправка обновлений мастеру
 
     res.statusCode = 201;
     res.setHeader('Content-Type', 'application/json');
-    return res.end(JSON.stringify(newUser));
+   return  res.end(JSON.stringify(newUser));
   } catch (error) {
     res.statusCode = 500;
-    return res.end(JSON.stringify({ error: error.message }));
+   return  res.end(JSON.stringify({ error: error.message }));
   }
 }
 
-// Обновление пользователя по ID
 export async function getUserUpdateId(
   id: string,
   res: http.ServerResponse,
-  req: http.IncomingMessage,
-  syncWithMaster: (users: User[]) => void
+  req: http.IncomingMessage
 ) {
   if (!validate(id)) {
     res.statusCode = 400;
@@ -70,26 +72,22 @@ export async function getUserUpdateId(
     user.id === id ? { ...user, ...body } : user
   );
 
-  syncWithMaster(data.users);
+  sendUpdateToMaster();
 
   res.setHeader('Content-Type', 'application/json');
-  return res.end(JSON.stringify({ message: 'User updated' }));
+ return  res.end(JSON.stringify({ message: 'User updated' }));
 }
 
-export function deleteUser(
-  id: string,
-  res: http.ServerResponse,
-  syncWithMaster: (users: User[]) => void
-) {
+export function deleteUser(id: string, res: http.ServerResponse) {
   if (!validate(id)) {
     res.statusCode = 400;
     return res.end(JSON.stringify({ error: 'Invalid userId format' }));
   }
 
   data.users = data.users.filter((user) => user.id !== id);
-  
-  syncWithMaster(data.users);
+
+  sendUpdateToMaster();
 
   res.setHeader('Content-Type', 'application/json');
-  return res.end(JSON.stringify({ message: 'User deleted' }));
+ return  res.end(JSON.stringify({ message: 'User deleted' }));
 }

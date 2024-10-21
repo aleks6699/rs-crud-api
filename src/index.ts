@@ -5,16 +5,16 @@ import { createUser, getUsers, getUserById, getUserUpdateId, deleteUser } from '
 import { data } from './const';
 
 const PORT = parseInt(process.env.PORT) || 4000;
-const WORKER_PORT_START = 4001
+const WORKER_PORT_START = 4001;
 const numCPUs = os.cpus().length;
 let currentWorkerIndex = 0;
 
 function createServer(port: number) {
   const server = http.createServer((req, res) => {
-    const id = req.url.split('/').pop();
+    const id = req.url?.split('/').pop();
 
     if (req.method === 'POST' && req.url === '/api/users') {
-      return createUser(req, res, syncWithMaster);
+      return createUser(req, res);
     }
 
     if (req.method === 'GET' && req.url === '/api/users') {
@@ -26,11 +26,11 @@ function createServer(port: number) {
     }
 
     if (req.method === 'PUT' && req.url.startsWith('/api/users/')) {
-      return getUserUpdateId(id, res, req, syncWithMaster);
+      return getUserUpdateId(id, res, req);
     }
 
     if (req.method === 'DELETE' && req.url.startsWith('/api/users/')) {
-      return deleteUser(id, res, syncWithMaster);
+      return deleteUser(id, res);
     }
 
     res.statusCode = 404;
@@ -46,17 +46,6 @@ function createServer(port: number) {
   });
 }
 
-function syncWithMaster(updatedUsers:any) {
-
-  console.log('Updating local data object...');
-  console.log('Local data updated:', data.users); 
-  
-  data.users = updatedUsers; 
-  if (process.send) {
-    process.send({ type: 'UPDATE_DATA', users: updatedUsers });
-    console.log('Sent update to master:', updatedUsers); 
-  }
-}
 
 
 function startCluster() {
@@ -66,19 +55,19 @@ function startCluster() {
     for (let i = 0; i < numCPUs; i++) {
       const worker = cluster.fork({ PORT: WORKER_PORT_START + i });
 
-      // Обработка сообщений от рабочих процессов
       worker.on('message', (message) => {
         if (message.type === 'UPDATE_DATA') {
-          data.users = message.users; 
-          console.log('Data synced with master:', data.users);
+          data.users = message.users;
+          console.log('Received update from master:', data.users);
+          broadcastToWorkers({ type: 'SYNC_DATA', users: data.users });
         }
       });
     }
 
-
     const loadBalancer = http.createServer((req, res) => {
       const workerPort = WORKER_PORT_START + currentWorkerIndex;
       currentWorkerIndex = (currentWorkerIndex + 1) % numCPUs;
+
       const options = {
         hostname: 'localhost',
         port: workerPort,
@@ -92,22 +81,43 @@ function startCluster() {
         proxyRes.pipe(res);
       });
 
+      proxy.on('error', (error) => {
+        console.error(`Proxy error: ${error.message}`);
+        res.statusCode = 500;
+        res.end('Internal Server Error');
+      });
+
       req.pipe(proxy);
     });
 
     loadBalancer.listen(PORT, () => {
-      console.log(`Load balancer running on http://localhost:${PORT}`);
+      console.log(`Load balancer running at http://localhost:${PORT}`);
     });
 
     cluster.on('exit', (worker) => {
-      console.log(`Worker ${worker.process.pid} exited`);
+      console.log(`Worker ${worker.process.pid} EXITED`);
+      const newWorker = cluster.fork({ PORT: WORKER_PORT_START + currentWorkerIndex });
     });
   } else {
     const workerPort = parseInt(process.env.PORT);
     createServer(workerPort);
+
+    process.send?.({ type: 'REQUEST_SYNC' });
+
+    process.on('message', (message: any) => {
+      if (message.type === 'SYNC_DATA') {
+        data.users = message.users;
+        console.log(`Worker ${process.pid} synced data:`, data.users);
+      }
+    });
   }
 }
 
+function broadcastToWorkers(message: any) {
+  for (const id in cluster.workers) {
+    cluster.workers[id]?.send(message);
+  }
+}
 
 const isMultiMode = process.argv.includes('--multi');
 if (isMultiMode) {
